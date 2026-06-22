@@ -21,7 +21,6 @@ class Head(nn.Module):
         wei = q @ k.transpose(-2, -1) * C**-0.5  # (B, T, T)
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # Mask future tokens
         wei = F.softmax(wei, dim=-1)  # (B, T, T)
-
         v = self.value(x)  # (B, T, head_size)
         out = wei @ v  # (B, T, head_size)
         return out

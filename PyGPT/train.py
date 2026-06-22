@@ -5,19 +5,19 @@ from model import GPT
 from tqdm import tqdm
 
 # Hyperparameters
-block_size = 128 # The maximum length of the input sequence
-batch_size = 128 # How many sequences to process at once (increased for GPU)
-max_iters = 50 # Total number of training iterations (reduced to save credits)
-eval_interval = 50 # How often to evaluate on validation data (reduced to save time)
+block_size = 64 # The maximum length of the input sequence
+batch_size = 32 # How many sequences to process at once
+max_iters = 100 # Total number of training iterations
+eval_interval = 20 # How often to evaluate on validation data
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 50 # Number of iterations to average over for evaluation (reduced to save time)
+eval_iters = 10 # Number of iterations to average over for evaluation
 use_mixed_precision = torch.cuda.is_available() # Enable mixed precision on GPU
 
 # Model hyperparameters
-n_embd = 384 # The size of the embedding vector
+n_embd = 192 # The size of the embedding vector (smaller for CPU)
 n_head = 6 # Number of attention heads
-n_layer = 6 # Number of transformer blocks
+n_layer = 3 # Number of transformer blocks (smaller for CPU)
 vocab_size = None # Will be set from data
 
 print(f"Training on device: {device}")
