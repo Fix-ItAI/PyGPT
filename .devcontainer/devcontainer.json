@@ -1,0 +1,8 @@
+{
+  "name": "PyGPT Dev Container",
+  "features": {
+    "ghcr.io/devcontainers/features/nvidia-cuda:3.0.0": {
+      "installCudnn": true
+    }
+  }
+}
