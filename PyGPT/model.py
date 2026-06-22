@@ -103,6 +103,8 @@ class GPT(nn.Module):
         for _ in range(max_new_tokens):
             # Crop idx to the last block_size tokens
             idx_cond = idx[:, -block_size:]
+            if idx_cond.size(1) == 0:
+                idx_cond = torch.zeros((idx.size(0), 1), dtype=torch.long, device=idx.device)
             logits, loss = self(idx_cond)
             # Focus only on the last time step
             logits = logits[:, -1, :]  # becomes (B, C)

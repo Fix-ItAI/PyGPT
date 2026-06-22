@@ -1,47 +1,52 @@
+import argparse
 import torch
-from torch.utils.data import DataLoader
 from data import get_dataloaders
 from model import GPT
 from tqdm import tqdm
 
-# Hyperparameters
-block_size = 64 # The maximum length of the input sequence
-batch_size = 32 # How many sequences to process at once
-max_iters = 100 # Total number of training iterations
-eval_interval = 20 # How often to evaluate on validation data
-learning_rate = 3e-4
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 10 # Number of iterations to average over for evaluation
-use_mixed_precision = torch.cuda.is_available() # Enable mixed precision on GPU
+parser = argparse.ArgumentParser(description="Train the PyGPT model on text files or default Gutenberg data.")
+parser.add_argument('files', nargs='*', help='Optional text files or file names to use for training.')
+parser.add_argument('--data-files', '--datafile', '--data-file', nargs='+', help='Paths to text files or directories to use for training data. If omitted, default Gutenberg text is downloaded.')
+parser.add_argument('--block-size', type=int, default=64, help='Maximum length of the input sequence.')
+parser.add_argument('--batch-size', type=int, default=32, help='How many sequences to process at once.')
+parser.add_argument('--max-iters', type=int, default=100, help='Total number of training iterations.')
+parser.add_argument('--eval-interval', type=int, default=20, help='How often to evaluate on validation data.')
+parser.add_argument('--learning-rate', type=float, default=3e-4, help='Learning rate for AdamW.')
+parser.add_argument('--n-embd', type=int, default=192, help='Embedding dimension size.')
+parser.add_argument('--n-head', type=int, default=6, help='Number of attention heads.')
+parser.add_argument('--n-layer', type=int, default=3, help='Number of transformer blocks.')
+parser.add_argument('--save-path', type=str, default='model.pth', help='File path for saving the trained model.')
+args = parser.parse_args()
 
-# Model hyperparameters
-n_embd = 192 # The size of the embedding vector (smaller for CPU)
-n_head = 6 # Number of attention heads
-n_layer = 3 # Number of transformer blocks (smaller for CPU)
-vocab_size = None # Will be set from data
+data_files = args.data_files or args.files or None
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+eval_iters = 10
+use_mixed_precision = torch.cuda.is_available()
 
 print(f"Training on device: {device}")
 if device == 'cuda':
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 
-# Get data (auto-configured for CPU or GPU)
-train_loader, val_loader, vocab_size, itos = get_dataloaders(block_size, batch_size)
+if data_files:
+    print(f"Using training files: {data_files}")
+else:
+    print("No local training files provided. Downloading default Gutenberg text.")
 
-# Instantiate the model
-model = GPT(vocab_size, n_embd, n_head, n_layer, block_size)
-m = model.to(device)
+train_loader, val_loader, vocab_size, itos = get_dataloaders(
+    block_size=args.block_size,
+    batch_size=args.batch_size,
+    file_paths=data_files,
+)
 
-# Print the number of parameters in the model
-print(f"Model has {sum(p.numel() for p in m.parameters())/1e6:.2f}M parameters")
+model = GPT(vocab_size, args.n_embd, args.n_head, args.n_layer, args.block_size)
+model = model.to(device)
 
-# Create the optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-
-# Mixed precision scaler for faster training on GPU
+print(f"Model has {sum(p.numel() for p in model.parameters())/1e6:.2f}M parameters")
+optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 scaler = torch.cuda.amp.GradScaler() if use_mixed_precision else None
 
-# Estimate loss on train or val sets
 @torch.no_grad()
 def estimate_loss():
     out = {}
@@ -62,28 +67,22 @@ def estimate_loss():
     model.train()
     return out
 
-# Training loop
 train_iter = iter(train_loader)
-for iter_num in tqdm(range(max_iters)):
-    # Every once in a while evaluate the loss on train and val sets
-    if iter_num % eval_interval == 0 or iter_num == max_iters - 1:
+for iter_num in tqdm(range(args.max_iters)):
+    if iter_num % args.eval_interval == 0 or iter_num == args.max_iters - 1:
         losses = estimate_loss()
         print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-    # Get a batch of data
     try:
         xb, yb = next(train_iter)
     except StopIteration:
-        # Re-create the iterator if we run out of data
         train_iter = iter(train_loader)
         xb, yb = next(train_iter)
 
-    # Forward pass
     xb, yb = xb.to(device), yb.to(device)
     if use_mixed_precision:
         with torch.cuda.amp.autocast():
             logits, loss = model(xb, yb)
-        # Backward pass with mixed precision
         optimizer.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -92,11 +91,9 @@ for iter_num in tqdm(range(max_iters)):
         scaler.update()
     else:
         logits, loss = model(xb, yb)
-        # Backward pass
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
 
-# Save the model
-torch.save(model.state_dict(), 'model.pth')
-print("Model saved to model.pth")
+torch.save(model.state_dict(), args.save_path)
+print(f"Model saved to {args.save_path}")

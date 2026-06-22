@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent
+SCRIPT_DIR = REPO_ROOT / "PyGPT"
+
+
+def build_script_args(args, known_defaults):
+    script_args = []
+    for name, value in vars(args).items():
+        if name in known_defaults or value is None:
+            continue
+        if name == 'files' or name == 'prompt':
+            continue
+        if isinstance(value, bool):
+            if value:
+                script_args.append(f"--{name.replace('_', '-')}")
+        else:
+            if value != known_defaults[name]:
+                script_args.extend([f"--{name.replace('_', '-')}", str(value)])
+    return script_args
+
+
+def run_script(script_name, script_args):
+    script_path = SCRIPT_DIR / f"{script_name}.py"
+    if not script_path.exists():
+        raise FileNotFoundError(f"Could not find {script_path}")
+    cmd = [sys.executable, str(script_path)] + script_args
+    return subprocess.run(cmd).returncode
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="pygpt", description="PyGPT command wrapper.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    train = subparsers.add_parser("train", help="Train the model with optional text files.")
+    train.add_argument("files", nargs="*", help="Optional text files or file names to use for training.")
+    train.add_argument("--block-size", type=int, default=64, help="Maximum length of the input sequence.")
+    train.add_argument("--batch-size", type=int, default=32, help="Batch size.")
+    train.add_argument("--max-iters", type=int, default=100, help="Total number of training iterations.")
+    train.add_argument("--eval-interval", type=int, default=20, help="How often to evaluate validation loss.")
+    train.add_argument("--learning-rate", type=float, default=3e-4, help="Learning rate.")
+    train.add_argument("--n-embd", type=int, default=192, help="Embedding dimension.")
+    train.add_argument("--n-head", type=int, default=6, help="Number of attention heads.")
+    train.add_argument("--n-layer", type=int, default=3, help="Number of transformer blocks.")
+    train.add_argument("--save-path", type=str, default="model.pth", help="Where to save the trained model.")
+
+    generate = subparsers.add_parser("generate", help="Generate text with a trained model.")
+    generate.add_argument("prompt", nargs="*", help="Optional prompt text.")
+    generate.add_argument("--model-path", type=str, default="model.pth", help="Path to the trained model file.")
+    generate.add_argument("--data-files", nargs="+", help="Paths to text files or directories used during training.")
+    generate.add_argument("--block-size", type=int, default=64, help="Block size to match the trained model.")
+    generate.add_argument("--n-embd", type=int, default=192, help="Embedding dimension size to match the trained model.")
+    generate.add_argument("--n-head", type=int, default=6, help="Number of attention heads to match the trained model.")
+    generate.add_argument("--n-layer", type=int, default=3, help="Number of transformer blocks to match the trained model.")
+    generate.add_argument("--max-new-tokens", type=int, default=500, help="Number of new tokens to generate.")
+
+    download = subparsers.add_parser("download", help="Download the default Gutenberg text for training.")
+    download.add_argument("--output", type=str, default="PyGPT/data/default.txt", help="Output path for the default text.")
+
+    args = parser.parse_args()
+
+    if args.command == "train":
+        script_args = []
+        if args.files:
+            script_args.extend(args.files)
+        known_defaults = {
+            "block_size": 64,
+            "batch_size": 32,
+            "max_iters": 100,
+            "eval_interval": 20,
+            "learning_rate": 3e-4,
+            "n_embd": 192,
+            "n_head": 6,
+            "n_layer": 3,
+            "save_path": "model.pth",
+        }
+        script_args.extend(build_script_args(args, known_defaults))
+        return run_script("train", script_args)
+
+    if args.command == "generate":
+        script_args = []
+        if args.prompt:
+            script_args.extend(["--prompt", " ".join(args.prompt)])
+        if args.data_files:
+            script_args.extend(["--data-files", *args.data_files])
+        known_defaults = {
+            "model_path": "model.pth",
+            "block_size": 64,
+            "n_embd": 192,
+            "n_head": 6,
+            "n_layer": 3,
+            "max_new_tokens": 500,
+        }
+        script_args.extend(build_script_args(args, known_defaults))
+        return run_script("generate", script_args)
+
+    if args.command == "download":
+        output_path = REPO_ROOT / args.output
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        from PyGPT.data import download_data
+        text = download_data()
+        output_path.write_text(text, encoding="utf-8")
+        print(f"Downloaded default text to {output_path}")
+        return 0
+
+    parser.print_help()
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

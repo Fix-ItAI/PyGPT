@@ -1,0 +1,101 @@
+{
+  "name": "pygpt-vscode",
+  "displayName": "PyGPT",
+  "description": "VS Code extension wrapper for the PyGPT command-line tools.",
+  "version": "0.0.1",
+  "publisher": "pygpt",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onCommand:pygpt.train",
+    "onCommand:pygpt.generate",
+    "onCommand:pygpt.download",
+    "onView:pygpt-sidebar"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pygpt.train",
+        "title": "PyGPT: Train Model",
+        "category": "PyGPT"
+      },
+      {
+        "command": "pygpt.generate",
+        "title": "PyGPT: Generate Text",
+        "category": "PyGPT"
+      },
+      {
+        "command": "pygpt.download",
+        "title": "PyGPT: Download Default Dataset",
+        "category": "PyGPT"
+      },
+      {
+        "command": "pygpt.setApiKey",
+        "title": "PyGPT: Set API Key",
+        "category": "PyGPT"
+      },
+      {
+        "command": "pygpt.setLocalModel",
+        "title": "PyGPT: Set Local Model Path",
+        "category": "PyGPT"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pygpt",
+          "title": "PyGPT",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "pygpt": [
+        {
+          "id": "pygpt-sidebar",
+          "name": "PyGPT Chat"
+        }
+      ]
+    }
+  ,
+    "configuration": {
+      "type": "object",
+      "title": "PyGPT",
+      "properties": {
+        "pygpt.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for external providers (stored in workspace settings)."
+        },
+        "pygpt.apiProvider": {
+          "type": "string",
+          "default": "openai",
+          "description": "External API provider identifier (e.g., openai)."
+        },
+        "pygpt.model": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "Default model name to use for external API calls."
+        },
+        "pygpt.useLocalModel": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, use a local trained model for generation instead of external API."
+        },
+        "pygpt.localModelPath": {
+          "type": "string",
+          "default": "model.pth",
+          "description": "Path to a local model file relative to the workspace root."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "npx vsce package"
+  },
+  "devDependencies": {
+    "vsce": "^2.0.0"
+  }
+}
